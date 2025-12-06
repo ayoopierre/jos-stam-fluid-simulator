@@ -48,6 +48,8 @@ public:
             }
         }
 
+        // printf("%0.10lf, %0.10lf, %d\n", minVal, maxVal, maxVal > minVal);
+
         for (int y = 0; y < f->N + 2; y++) {
             for (int x = 0; x < f->N + 2; x++) {
                 double v = f->density[f->at(x, y)];
@@ -68,7 +70,7 @@ public:
 
     inline void handle_input()
     {
-                static Vector2 prev = {0};
+        static Vector2 prev = {0};
         Vector2 mouse_pos = GetMousePosition();
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
         {
@@ -79,7 +81,7 @@ public:
             float dy = 5 * (mouse_pos.y - prev.y) / (float)this->height;
 
             f->add_fluid(x, y, 10.5f);
-            // printf("Density value (%d, %d): %f\n", x, y, f->get_density(x, y));
+            printf("Density value (%d, %d): %f\n", x, y, f->density[f->at(x, y)]);
         }
         prev = mouse_pos;
     }

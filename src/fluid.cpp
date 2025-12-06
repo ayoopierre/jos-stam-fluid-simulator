@@ -19,7 +19,8 @@ Fluid::Fluid(size_t N)
     divergence.resize((N + 2) * (N + 2));
     p.resize((N + 2) * (N + 2));
 
-    auto l = [](double& v) { v = (rand() / (double)RAND_MAX) - 0.5; };
+    auto l = [](double &v)
+    { v = (rand() / (double)RAND_MAX) - 0.5; };
     std::for_each(u.begin(), u.end(), l);
     std::for_each(v.begin(), v.end(), l);
 
@@ -33,16 +34,64 @@ Fluid::Fluid(size_t N)
 void Fluid::diffuse_density(double dt)
 {
     double a = diff * dt * (1.0 / h) * (1.0 / h);
+
     laplace_eq_GS_solver(new_density.data(), density.data(), a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleRho);
+
     std::swap(density, new_density);
 }
 
 void Fluid::diffues_velocity(double dt)
 {
+    double a = visc * dt * (1.0 / h) * (1.0 / h);
+
+    laplace_eq_GS_solver(new_u.data(), u.data(), a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleU);
+    laplace_eq_GS_solver(new_v.data(), v.data(), a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleV);
+
+    std::swap(new_u, u);
+    std::swap(new_v, v);
 }
 
 void Fluid::project()
 {
+    /* This function will remove divergence component from velocity field */
+    for (int i = 1; i <= N; i++)
+    {
+        for (int j = 1; j <= N; j++)
+        {
+            divergence[at(i, j)] = -0.5 * h * (u[at(i + 1, j)] - u[at(i - 1, j)] + v[at(i, j + 1) - v[at(i, j - 1)]]);
+            p[at(i, j)] = 0.0;
+        }
+    }
+
+    handle_boundaries(BoundaryHandleEnum::HandleRho, divergence.data());
+    handle_boundaries(BoundaryHandleEnum::HandleRho, p.data());
+
+    /* Now we want to find such p's that they equal divergence */
+    laplace_eq_GS_solver(p.data(), divergence.data(), 1.0, 4.0, BoundaryHandleEnum::HandleRho);
+
+    double highest_divergence = __DBL_MIN__;
+
+    for (int i = 1; i <= N; i++)
+    {
+        for (int j = 1; j <= N; j++)
+        {
+            u[at(i, j)] -= 0.5 * (p[at(i + 1, j)] - p[at(i - 1, j)]) / h;
+            v[at(i, j)] -= 0.5 * (p[at(i, j + 1)] - p[at(i, j - 1)]) / h;
+        }
+    }
+
+    for (int i = 1; i <= N; i++)
+    {
+        for (int j = 1; j <= N; j++)
+        {
+            double d = -0.5 * h * (u[at(i + 1, j)] - u[at(i - 1, j)] + v[at(i, j + 1) - v[at(i, j - 1)]]);
+            if(d > highest_divergence) highest_divergence = d;
+        }
+    }
+    // printf("Highest divergence %lf\n", highest_divergence);
+
+    handle_boundaries(BoundaryHandleEnum::HandleU, u.data());
+    handle_boundaries(BoundaryHandleEnum::HandleV, v.data());
 }
 
 void Fluid::advect_field(double dt, double *input_field, double *output_field)
@@ -69,6 +118,14 @@ void Fluid::advect_density(double dt)
 
 void Fluid::advect_velocity(double dt)
 {
+    advect_field(dt, u.data(), new_u.data());
+    advect_field(dt, v.data(), new_v.data());
+
+    handle_boundaries(BoundaryHandleEnum::HandleU, new_u.data());
+    handle_boundaries(BoundaryHandleEnum::HandleV, new_v.data());
+
+    std::swap(new_u, u);
+    std::swap(new_v, v);
 }
 
 void Fluid::handle_boundaries(enum BoundaryHandleEnum e, double *data)
@@ -123,7 +180,6 @@ void Fluid::handle_boundaries(enum BoundaryHandleEnum e, double *data)
 
 double Fluid::sample_field(double x, double y, double *field)
 {
-    // printf("Sampling field\n");
     // clang-format off
     if (x < h) x = h / 2;
     if (x > N * h) x = N * h + h / 2;
@@ -144,8 +200,6 @@ double Fluid::sample_field(double x, double y, double *field)
     double y2 = (j2 * h);
 
     double a = (x2 - x1) * (y2 - y1);
-
-    if(std::abs(a) < __DBL_EPSILON__) throw 1;
 
     double w11 = (x2 - x) * (y2 - y) / a;
     double w12 = (x2 - x) * (y - y1) / a;

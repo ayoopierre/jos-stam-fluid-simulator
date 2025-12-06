@@ -17,6 +17,7 @@ public:
     inline void step(double dt)
     {
         density_step(dt);
+        velocity_step(dt);
     }
 
     inline void density_step(double dt)
@@ -27,6 +28,10 @@ public:
 
     inline void velocity_step(double dt)
     {
+        diffues_velocity(dt);
+        project();
+        advect_velocity(dt);
+        project();
     }
 
     inline void add_fluid(int x, int y, double val)
