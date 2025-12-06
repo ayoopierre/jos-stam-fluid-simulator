@@ -36,17 +36,17 @@ Fluid::Fluid(size_t N)
 
 void Fluid::apply_sources(double dt)
 {
-    for(int i = 1; i <= N; i++){
-        density[at(1, i)] += 1.0 * dt;
-    }
+    density[at(N / 2, N / 2)] += 0.3 * dt;
+    v[at(N / 2, N / 2)] += 0.2 * dt;
 }
 
-void Fluid::apply_forces(double dt)
-{
-    for(int i = 1; i <= N; i++){
-        u[at(1, i)] += 1.0 * dt;
-    }
-}
+// void Fluid::apply_forces(double dt)
+// {
+//     for (int i = 1; i <= N; i++)
+//     {
+//         u[at(1, i)] += 1.0 * dt;
+//     }
+// }
 
 void Fluid::diffuse_density(double dt)
 {
@@ -87,31 +87,14 @@ void Fluid::project()
     /* Now we want to find such p's that they equal divergence */
     laplace_eq_GS_solver(p.data(), divergence.data(), 1.0, 4.0, BoundaryHandleEnum::HandleRho);
 
-    double highest_vel = __DBL_MIN__;
-
     for (int i = 1; i <= N; i++)
     {
         for (int j = 1; j <= N; j++)
         {
             u[at(i, j)] -= 0.5 * (p[at(i + 1, j)] - p[at(i - 1, j)]) / h;
             v[at(i, j)] -= 0.5 * (p[at(i, j + 1)] - p[at(i, j - 1)]) / h;
-
-            double a = v[at(i, j)] * v[at(i, j)] + u[at(i, j)] * u[at(i, j)];
-            if(a > highest_vel) highest_vel = a;
         }
     }
-
-    printf("%lf\n", highest_vel);
-
-    // for (int i = 1; i <= N; i++)
-    // {
-    //     for (int j = 1; j <= N; j++)
-    //     {
-    //         double d = -0.5 * h * (u[at(i + 1, j)] - u[at(i - 1, j)] + v[at(i, j + 1) - v[at(i, j - 1)]]);
-    //         if(d > highest_divergence) highest_divergence = d;
-    //     }
-    // }
-    //
 
     handle_boundaries(BoundaryHandleEnum::HandleU, u.data());
     handle_boundaries(BoundaryHandleEnum::HandleV, v.data());
@@ -123,8 +106,8 @@ void Fluid::advect_field(double dt, double *input_field, double *output_field)
     {
         for (int j = 1; j <= N; j++)
         {
-            double x = i * h - dt * u[at(i, j)];
-            double y = j * h - dt * v[at(i, j)];
+            double x = i * h - dt * N * u[at(i, j)];
+            double y = j * h - dt * N * v[at(i, j)];
 
             /* Field sampling already clamps point to simulation domain */
             output_field[at(i, j)] = sample_field(x, y, input_field);
@@ -203,33 +186,52 @@ void Fluid::handle_boundaries(enum BoundaryHandleEnum e, double *data)
 
 double Fluid::sample_field(double x, double y, double *field)
 {
-    // clang-format off
-    if (x < h) x = h / 2;
-    if (x > N * h) x = N * h + h / 2;
+    // clamp coordinates to the interior cell-centers range: [h/2, N*h - h/2]
+    double halfh = 0.5 * h;
+    double xmax = N * h - halfh;
+    double ymax = N * h - halfh;
 
-    if (y < h) y = h / 2;
-    if (y > N * h) y = N * h + h / 2;
-    // clang-format on
+    if (x < halfh)
+        x = halfh;
+    if (x > xmax)
+        x = xmax;
+    if (y < halfh)
+        y = halfh;
+    if (y > ymax)
+        y = ymax;
 
-    /* Blinear interpolation */
-    int i1 = std::floor(x / h);
-    int j1 = std::floor(y / h);
-    int i2 = std::ceil(x / h);
-    int j2 = std::ceil(y / h);
+    // convert to grid coordinates (1..N in cell indices, but 0..N+1 in array)
+    double gx = x / h;
+    double gy = y / h;
 
-    double x1 = (i1 * h);
-    double y1 = (j1 * h);
-    double x2 = (i2 * h);
-    double y2 = (j2 * h);
+    int i0 = (int)floor(gx); // base index
+    int j0 = (int)floor(gy);
+    int i1 = i0 + 1;
+    int j1 = j0 + 1;
 
-    double a = (x2 - x1) * (y2 - y1);
+    // fractional parts
+    double sx = gx - i0;
+    double sy = gy - j0;
 
-    double w11 = (x2 - x) * (y2 - y) / a;
-    double w12 = (x2 - x) * (y - y1) / a;
-    double w21 = (x - x1) * (y2 - y) / a;
-    double w22 = (x - x1) * (y - y1) / a;
+    // clamp indices to valid array bounds [0 .. N+1]
+    i0 = std::clamp(i0, 0, (int)N + 1);
+    i1 = std::clamp(i1, 0, (int)N + 1);
+    j0 = std::clamp(j0, 0, (int)N + 1);
+    j1 = std::clamp(j1, 0, (int)N + 1);
 
-    return w11 * field[at(i1, j1)] + w12 * field[at(i1, j2)] + w21 * field[at(i2, j1)] + w22 * field[at(i2, j2)];
+    // bilinear interpolation
+    double f00 = field[at(i0, j0)];
+    double f01 = field[at(i0, j1)];
+    double f10 = field[at(i1, j0)];
+    double f11 = field[at(i1, j1)];
+
+    double res =
+        (1.0 - sx) * (1.0 - sy) * f00 +
+        (1.0 - sx) * sy * f01 +
+        sx * (1.0 - sy) * f10 +
+        sx * sy * f11;
+
+    return res;
 }
 
 void Fluid::laplace_eq_GS_solver(double *x, double *b, double a, double c, enum BoundaryHandleEnum e)

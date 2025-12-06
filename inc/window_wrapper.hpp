@@ -87,8 +87,8 @@ public:
             float dy = (mouse_pos.y - prev.y) / (float)this->height;
 
             f->add_fluid(x, y, 0.1);
-            f->add_u(x, y, dx * 10.0);
-            f->add_v(x, y, dy * 10.0);
+            f->add_u(x, y, dx);
+            f->add_v(x, y, -dy);
         }
         prev = mouse_pos;
     }
