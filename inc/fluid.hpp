@@ -90,7 +90,7 @@ private:
 
     size_t N;
 
-    double box_length = 3.0;
+    double box_length = 1.0;
     double h;
 
     double diff = 0.01;

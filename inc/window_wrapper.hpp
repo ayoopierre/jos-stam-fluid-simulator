@@ -21,7 +21,7 @@ public:
         InitWindow(width, height, "My window");
         this->width = width;
         this->height = height;
-        img = GenImageColor(f->N + 2, f->N + 2, BLANK);
+        img = GenImageColor(width, height, BLANK);
         tex = LoadTextureFromImage(img);
         pixels = LoadImageColors(img);
         this->f = f;
@@ -52,25 +52,29 @@ public:
             }
         }
 
-        //
-
-        for (int y = 0; y < f->N + 2; y++)
+        for (int y = 0; y < height; y++)
         {
-            for (int x = 0; x < f->N + 2; x++)
+            for (int x = 0; x < width; x++)
             {
-                double v = f->density[f->at(x, y)];
+                double f_x = f->box_length * x / (double)width;
+                double f_y = f->box_length * y / (double)height;
+                // printf("%lf, %lf\n", f_x, f_y);
+                double v = f->sample_field(f_x, f_y, f->density.data());
                 double t = (v - minVal) / (maxVal - minVal);
-                pixels[f->at(x, y)] = HeatColor(t);
+                pixels[y * width + x] = HeatColor(t);
             }
         }
 
         UpdateTexture(tex, pixels);
+
         DrawTexturePro(tex,
-                       (Rectangle){0, 0, (float)f->N, (float)f->N},
+                       (Rectangle){0, 0, (float)width, (float)height},
                        (Rectangle){0, 0, (float)this->width, (float)this->height},
                        (Vector2){0, 0},
                        0,
                        WHITE);
+
+        DrawText(TextFormat("FPS: %i", GetFPS()), 10, height - 30, 20, GREEN);
         EndDrawing();
     }
 
