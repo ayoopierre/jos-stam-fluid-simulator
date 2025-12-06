@@ -32,9 +32,32 @@ public:
         project();
         advect_velocity(dt);
         project();
+        double highest_vel = __DBL_MIN__;
+
+        for (int i = 1; i <= N; i++)
+        {
+            for (int j = 1; j <= N; j++)
+            {
+                double a = v[at(i, j)] * v[at(i, j)] + u[at(i, j)] * u[at(i, j)];
+                if (a > highest_vel)
+                    highest_vel = a;
+            }
+        }
+
+        printf("%lf\n", highest_vel);
     }
 
     inline void add_fluid(int x, int y, double val)
+    {
+        density[at(x, y)] += val;
+    }
+
+    inline void add_u(int x, int y, double val)
+    {
+        density[at(x, y)] += val;
+    }
+
+    inline void add_v(int x, int y, double val)
     {
         density[at(x, y)] += val;
     }
@@ -51,6 +74,7 @@ private:
         HandleRho
     };
 
+    void apply_sources(double dt);
     void apply_forces(double dt);
     void diffuse_density(double dt);
     void diffues_velocity(double dt);
@@ -79,11 +103,11 @@ private:
 
     size_t N;
 
-    double box_length = 2.0;
+    double box_length = 3.0;
     double h;
 
     double diff = 0.01;
-    double visc;
+    double visc = 0.01;
 };
 
 #endif

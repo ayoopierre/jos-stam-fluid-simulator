@@ -21,6 +21,9 @@ Fluid::Fluid(size_t N)
 
     auto l = [](double &v)
     { v = (rand() / (double)RAND_MAX) - 0.5; };
+
+    auto l1 = [](double &v)
+    { v = 1.0; };
     std::for_each(u.begin(), u.end(), l);
     std::for_each(v.begin(), v.end(), l);
 
@@ -29,6 +32,20 @@ Fluid::Fluid(size_t N)
     std::fill(new_u.begin(), new_u.end(), 0.1);
     std::fill(new_v.begin(), new_v.end(), 0.1);
     std::fill(new_density.begin(), new_density.end(), 1.0);
+}
+
+void Fluid::apply_sources(double dt)
+{
+    for(int i = 1; i <= N; i++){
+        density[at(1, i)] += 1.0 * dt;
+    }
+}
+
+void Fluid::apply_forces(double dt)
+{
+    for(int i = 1; i <= N; i++){
+        u[at(1, i)] += 1.0 * dt;
+    }
 }
 
 void Fluid::diffuse_density(double dt)
@@ -54,11 +71,12 @@ void Fluid::diffues_velocity(double dt)
 void Fluid::project()
 {
     /* This function will remove divergence component from velocity field */
+
     for (int i = 1; i <= N; i++)
     {
         for (int j = 1; j <= N; j++)
         {
-            divergence[at(i, j)] = -0.5 * h * (u[at(i + 1, j)] - u[at(i - 1, j)] + v[at(i, j + 1) - v[at(i, j - 1)]]);
+            divergence[at(i, j)] = -0.5 * h * (u[at(i + 1, j)] - u[at(i - 1, j)] + v[at(i, j + 1)] - v[at(i, j - 1)]);
             p[at(i, j)] = 0.0;
         }
     }
@@ -69,7 +87,7 @@ void Fluid::project()
     /* Now we want to find such p's that they equal divergence */
     laplace_eq_GS_solver(p.data(), divergence.data(), 1.0, 4.0, BoundaryHandleEnum::HandleRho);
 
-    double highest_divergence = __DBL_MIN__;
+    double highest_vel = __DBL_MIN__;
 
     for (int i = 1; i <= N; i++)
     {
@@ -77,18 +95,23 @@ void Fluid::project()
         {
             u[at(i, j)] -= 0.5 * (p[at(i + 1, j)] - p[at(i - 1, j)]) / h;
             v[at(i, j)] -= 0.5 * (p[at(i, j + 1)] - p[at(i, j - 1)]) / h;
+
+            double a = v[at(i, j)] * v[at(i, j)] + u[at(i, j)] * u[at(i, j)];
+            if(a > highest_vel) highest_vel = a;
         }
     }
 
-    for (int i = 1; i <= N; i++)
-    {
-        for (int j = 1; j <= N; j++)
-        {
-            double d = -0.5 * h * (u[at(i + 1, j)] - u[at(i - 1, j)] + v[at(i, j + 1) - v[at(i, j - 1)]]);
-            if(d > highest_divergence) highest_divergence = d;
-        }
-    }
-    // printf("Highest divergence %lf\n", highest_divergence);
+    printf("%lf\n", highest_vel);
+
+    // for (int i = 1; i <= N; i++)
+    // {
+    //     for (int j = 1; j <= N; j++)
+    //     {
+    //         double d = -0.5 * h * (u[at(i + 1, j)] - u[at(i - 1, j)] + v[at(i, j + 1) - v[at(i, j - 1)]]);
+    //         if(d > highest_divergence) highest_divergence = d;
+    //     }
+    // }
+    //
 
     handle_boundaries(BoundaryHandleEnum::HandleU, u.data());
     handle_boundaries(BoundaryHandleEnum::HandleV, v.data());

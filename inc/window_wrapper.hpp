@@ -40,18 +40,24 @@ public:
 
         double minVal = __DBL_MAX__, maxVal = __DBL_MIN__;
 
-        for (int y = 0; y < f->N + 2; y++) {
-            for (int x = 0; x < f->N + 2; x++) {
+        for (int y = 0; y < f->N + 2; y++)
+        {
+            for (int x = 0; x < f->N + 2; x++)
+            {
                 double v = f->density[f->at(x, y)];
-                if(v > maxVal) maxVal = v;
-                if(v < minVal) minVal = v;
+                if (v > maxVal)
+                    maxVal = v;
+                if (v < minVal)
+                    minVal = v;
             }
         }
 
-        // printf("%0.10lf, %0.10lf, %d\n", minVal, maxVal, maxVal > minVal);
+        //
 
-        for (int y = 0; y < f->N + 2; y++) {
-            for (int x = 0; x < f->N + 2; x++) {
+        for (int y = 0; y < f->N + 2; y++)
+        {
+            for (int x = 0; x < f->N + 2; x++)
+            {
                 double v = f->density[f->at(x, y)];
                 double t = (v - minVal) / (maxVal - minVal);
                 pixels[f->at(x, y)] = HeatColor(t);
@@ -77,24 +83,30 @@ public:
             int x = (int)(mouse_pos.x * f->N / this->width);
             int y = (int)(mouse_pos.y * f->N / this->height);
 
-            float dx = 5 * (mouse_pos.x - prev.x) / (float)this->width;
-            float dy = 5 * (mouse_pos.y - prev.y) / (float)this->height;
+            float dx = (mouse_pos.x - prev.x) / (float)this->width;
+            float dy = (mouse_pos.y - prev.y) / (float)this->height;
 
-            f->add_fluid(x, y, 10.5f);
-            printf("Density value (%d, %d): %f\n", x, y, f->density[f->at(x, y)]);
+            f->add_fluid(x, y, 0.1);
+            f->add_u(x, y, dx * 10.0);
+            f->add_v(x, y, dy * 10.0);
         }
         prev = mouse_pos;
     }
 
-    inline Color HeatColor(float t) {
+    inline Color HeatColor(float t)
+    {
         // Blue -> Cyan -> Green -> Yellow -> Red
+        // return (Color){
+        //     (unsigned char)(255 * t),                // red
+        //     (unsigned char)(255 * (1.0f - fabsf(t-0.5f)*2)), // green peak in middle
+        //     (unsigned char)(255 * (1.0f - t)),        // blue
+        //     255
         return (Color){
-            (unsigned char)(255 * t),                // red
-            (unsigned char)(255 * (1.0f - fabsf(t-0.5f)*2)), // green peak in middle
-            (unsigned char)(255 * (1.0f - t)),        // blue
-            255
-    };
-}
+            (unsigned char)(255 * t), // red
+            (unsigned char)(255 * t), // green peak in middle
+            (unsigned char)(255 * t), // blue
+            255};
+    }
 
     inline void close()
     {
