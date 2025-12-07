@@ -12,12 +12,23 @@
 #define MY_DBL_MIN double(2.22507385850720138309023271733240406e-308L)
 #endif
 
-struct MyBitmap{
+struct MyBitmap
+{
     Color *bitmap;
     size_t width;
     size_t height;
 };
 
 typedef MyBitmap MyBitmap;
+
+struct MyTile
+{
+    int start_x;
+    int start_y;
+    int width;
+    int height;
+};
+
+typedef MyTile MyTile;
 
 #endif
