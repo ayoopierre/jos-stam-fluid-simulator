@@ -16,6 +16,7 @@ public:
 
     inline void step(double dt)
     {
+        apply_sources(dt);
         density_step(dt);
         velocity_step(dt);
     }
@@ -93,8 +94,8 @@ private:
     double box_length = 1.0;
     double h;
 
-    double diff = 0.01;
-    double visc = 0.001;
+    double diff = 2.01;
+    double visc = 0.01;
 };
 
 #endif

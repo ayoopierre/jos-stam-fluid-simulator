@@ -23,11 +23,11 @@ Fluid::Fluid(size_t N)
     { v = (rand() / (double)RAND_MAX) - 0.5; };
 
     auto l1 = [](double &v)
-    { v = 1.0; };
-    std::for_each(u.begin(), u.end(), l);
-    std::for_each(v.begin(), v.end(), l);
+    { v = 0.0; };
+    std::for_each(u.begin(), u.end(), l1);
+    std::for_each(v.begin(), v.end(), l1);
 
-    std::fill(density.begin(), density.end(), 1.0);
+    std::fill(density.begin(), density.end(), 0.0);
 
     std::fill(new_u.begin(), new_u.end(), 0.1);
     std::fill(new_v.begin(), new_v.end(), 0.1);
@@ -36,8 +36,12 @@ Fluid::Fluid(size_t N)
 
 void Fluid::apply_sources(double dt)
 {
-    density[at(N / 2, N / 2)] += 0.3 * dt;
-    v[at(N / 2, N / 2)] += 0.2 * dt;
+    // density[at(N / 2, N / 2)] += 0.3 * dt;
+    for(int y = 4 * N / 10; y <= 6 * N / 10; y++){
+        v[at(1, y)] = 0.0;
+        u[at(1, y)] = 7.0;
+        density[at(1, y)] += 1.0;
+    }
 }
 
 // void Fluid::apply_forces(double dt)

@@ -5,7 +5,7 @@
 #include "window_wrapper.hpp"
 
 int main(void){
-    Fluid f(100);
+    Fluid f(200);
     Window w(800, 800, &f);
 
     // f.step(0.001);

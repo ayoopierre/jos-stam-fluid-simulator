@@ -74,7 +74,7 @@ public:
                        0,
                        WHITE);
 
-        DrawText(TextFormat("FPS: %i", GetFPS()), 10, height - 30, 20, GREEN);
+        DrawText(TextFormat("FPS: %i", GetFPS()), 10, 10, 20, GREEN);
         EndDrawing();
     }
 
