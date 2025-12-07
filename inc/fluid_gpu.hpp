@@ -20,13 +20,15 @@ class FluidGpu : public Fluid
 public:
     FluidGpu(size_t N);
 
-    inline void step(double dt)
+    inline void step(float dt)
     {
     }
 
 private:
-
-    void prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t*surf, cudaArray_t *arr);
+    void solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new,
+                                    cudaSurfaceObject_t x, cudaSurfaceObject_t b,
+                                    float a, float c);
+    void prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t *surf, cudaArray_t *arr);
 
     /* */
     cudaChannelFormatDesc channel_desc;
@@ -52,23 +54,23 @@ private:
     cudaSurfaceObject_t p_surf;
 
     /* Array handles */
-    cudaArray_t density_arr;
-    cudaArray_t u_arr;
-    cudaArray_t v_arr;
+    cudaArray_t *density_arr;
+    cudaArray_t *u_arr;
+    cudaArray_t *v_arr;
 
-    cudaArray_t temp_arr;
+    cudaArray_t *temp_arr;
 
-    cudaArray_t divergence_arr;
-    cudaArray_t p_arr;
+    cudaArray_t *divergence_arr;
+    cudaArray_t *p_arr;
 
     /* Fluid params */
     size_t N;
 
-    double box_length = 1.0;
-    double h;
+    float box_length = 1.0;
+    float h;
 
-    double diff = 1.01;
-    double visc = 0.01;
+    float diff = 1.01;
+    float visc = 0.01;
 };
 
 #endif
