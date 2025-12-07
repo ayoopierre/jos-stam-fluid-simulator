@@ -7,12 +7,15 @@
 #include <cmath>
 #include <cstdio>
 
+#include "fluid.hpp"
+#include "utils.hpp"
+
 class Window;
 
-class Fluid
+class FluidCpu : public Fluid
 {
 public:
-    Fluid(size_t N);
+    FluidCpu(size_t N);
 
     inline void step(double dt)
     {
@@ -50,7 +53,18 @@ public:
         density[at(x, y)] += val;
     }
 
+    void draw_into_bitmap(MyBitmap &bitmap);
+
     constexpr size_t at(size_t x, size_t y) noexcept { return y * (N + 2) + x; };
+
+    constexpr Color heat_color(float t) noexcept
+    {
+        return {
+            (unsigned char)(255 * t), // red
+            (unsigned char)(255 * t), // green peak in middle
+            (unsigned char)(255 * t), // blue
+            255};
+    }
 
 private:
     friend Window;

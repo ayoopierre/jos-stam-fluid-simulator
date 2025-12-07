@@ -1,0 +1,14 @@
+#ifndef MY_FLUID
+#define MY_FLUID
+
+#include "utils.hpp"
+
+class Fluid
+{
+public:
+    Fluid() = default;
+    virtual void step(double dt) = 0;
+    virtual void draw_into_bitmap(MyBitmap& bitmap) = 0;
+};
+
+#endif

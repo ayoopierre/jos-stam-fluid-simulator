@@ -1,11 +1,11 @@
 #include <cstdio>
 #include <thread>
 
-#include "fluid.hpp"
+#include "fluid_cpu.hpp"
 #include "window_wrapper.hpp"
 
 int main(void){
-    Fluid f(200);
+    FluidCpu f(200);
     Window w(800, 800, &f);
 
     // f.step(0.001);

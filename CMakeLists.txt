@@ -1,3 +1,7 @@
+# Issues with cmake:
+#nvcc -std=c++17 -I ./inc ./src/*.cu ./src/*.cpp -L /path/to/libs -lmylib -lotherlib -o main
+#nvcc -std=c++17 -I ./inc -I "C:\Users\Mikim\Documents\Tools\raylib-5.5_win64_msvc16\include" ./src/main.cpp ./src/fluid_cpu.cpp -L "C:\Users\Mikim\Documents\Tools\raylib-5.5_win64_msvc16\lib" -lraylib -o main
+
 cmake_minimum_required(VERSION 3.18) # 3.18+ recommended for good CUDA support
 project(MyProject LANGUAGES CXX CUDA)
 
