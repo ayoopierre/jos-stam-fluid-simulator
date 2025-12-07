@@ -12,7 +12,7 @@ int main(void){
 
     while (!w.shouldClose())
     {
-        f.step(0.001);
+        f.step(0.0005);
         w.update();
         w.handle_input();
     }   

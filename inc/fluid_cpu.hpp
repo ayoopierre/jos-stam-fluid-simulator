@@ -94,7 +94,7 @@ private:
     double box_length = 1.0;
     double h;
 
-    double diff = 2.01;
+    double diff = 1.01;
     double visc = 0.01;
 };
 

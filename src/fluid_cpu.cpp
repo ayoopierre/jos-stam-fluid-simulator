@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include "fluid.hpp"
+#include "fluid_cpu.hpp"
 
 Fluid::Fluid(size_t N)
 {
@@ -29,28 +29,19 @@ Fluid::Fluid(size_t N)
 
     std::fill(density.begin(), density.end(), 0.0);
 
-    std::fill(new_u.begin(), new_u.end(), 0.1);
-    std::fill(new_v.begin(), new_v.end(), 0.1);
-    std::fill(new_density.begin(), new_density.end(), 1.0);
+    std::fill(new_u.begin(), new_u.end(), 0.0);
+    std::fill(new_v.begin(), new_v.end(), 0.0);
+    std::fill(new_density.begin(), new_density.end(), 0.0);
 }
 
 void Fluid::apply_sources(double dt)
 {
-    // density[at(N / 2, N / 2)] += 0.3 * dt;
-    for(int y = 4 * N / 10; y <= 6 * N / 10; y++){
+    for(int y = 9 * N / 20; y <= 11 * N / 20; y++){
         v[at(1, y)] = 0.0;
-        u[at(1, y)] = 7.0;
-        density[at(1, y)] += 1.0;
+        u[at(1, y)] = 15.0;
+        density[at(1, y)] += 1.0 * dt;
     }
 }
-
-// void Fluid::apply_forces(double dt)
-// {
-//     for (int i = 1; i <= N; i++)
-//     {
-//         u[at(1, i)] += 1.0 * dt;
-//     }
-// }
 
 void Fluid::diffuse_density(double dt)
 {
