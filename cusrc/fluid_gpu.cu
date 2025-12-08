@@ -87,7 +87,7 @@ __global__ static void laplace_eq_solver_step_device(
     int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
 
     /*
-    We have block (threads.x + 2) * (threads.y + 2)
+    We have shmem (threads.x + 2) * (threads.y + 2)
     and since we got 1024 threads per group we have
     8Kb of shared memory for tile caching which should
     fit in any GPU L1 cache.
@@ -119,6 +119,60 @@ __global__ static void laplace_eq_solver_step_device(
         float val = (b + a * s) / c;
 
         surf2Dwrite<float>(val, x_next_surf, i * sizeof(float), j, cudaSurfaceBoundaryMode::cudaBoundaryModeZero);
+    }
+}
+
+__global__ static void prepare_projection_surfaces_device(
+    cudaSurfaceObject_t u_surf,
+    cudaSurfaceObject_t v_surf,
+    cudaSurfaceObject_t divergence_surf,
+    cudaSurfaceObject_t p_surf, int N)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+
+    /* TODO: Add similr caching as in the Jacobi solver */
+
+    if(i <= N && j <= N){
+        float u_i_p1 = surf2Dread<float>(u_surf, i + 1, j);
+        float u_i_m1 = surf2Dread<float>(u_surf, i - 1, j);
+        float v_j_p1 = surf2Dread<float>(v_surf, i, j + 1);
+        float v_j_m1 = surf2Dread<float>(v_surf, i, j - 1);
+
+        float val = -0.5f * (u_i_p1 - u_i_m1 + v_j_p1 - v_j_m1);
+        surf2Dwrite<float>(val, divergence_surf, i, j);
+
+        surf2Dwrite<float>(0.0f, p_surf, i, j);
+    }
+}
+
+__global__ static void apply_projection_surface_device(
+    cudaSurfaceObject_t u_surf,
+    cudaSurfaceObject_t v_surf,
+    cudaSurfaceObject_t p_surf,
+    cudaSurfaceObject_t x_surf,
+    cudaSurfaceObject_t x_new_surf,
+    int N, float h)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
+    int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
+
+    /* TODO: Add caching */
+
+    if(i <= N && j <= N){
+        float p_i_p1 = surf2Dread<float>(p_surf, i + 1, j);
+        float p_i_m1 = surf2Dread<float>(p_surf, i - 1, j);
+        float p_j_p1 = surf2Dread<float>(p_surf, i, j + 1);
+        float p_j_m1 = surf2Dread<float>(p_surf, i, j - 1);
+
+        float u = surf2Dread<float>(u_surf, i, j);
+        float v = surf2Dread<float>(v_surf, i, j);
+
+        u = u - 0.5 * (p_i_p1 - p_i_m1) / h;
+        v = v - 0.5 * (p_j_p1 - p_j_m1) / h;
+
+        surf2Dwrite<float>(u, x_surf, i, j);
+        surf2Dwrite<float>(v, x_new_surf, i, j);
     }
 }
 
@@ -182,7 +236,7 @@ __device__ static float bilerp_device(
 Not much we can use here as for shared memory in this case.
 We can cannot predict memory location to sample from so we
 cannot cache this in shared memory. There is not much to 
-leverage from surface locality.
+leverage from surface locality as well.
 */
 __global__ static void advect_field_device(
     cudaSurfaceObject_t u_surf,
@@ -217,7 +271,7 @@ FluidGpu::FluidGpu(size_t N)
 
     channel_desc = cudaCreateChannelDesc<float>();
 
-    err = GetLastError();
+    err = cudaGetLastError();
     CUDA_ERR_CHECK(err);
 
     prepare_surface(&density_desc, &density_surf, &density_arr);
@@ -235,7 +289,7 @@ void FluidGpu::diffuse_density(float dt)
 {
     float a = diff * dt * (1.0 / h) * (1.0 / h);
 
-    solve_laplace_eq_JA_solver(temp_surf, p_surf, density_surf, a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleRho);
+    solve_laplace_eq_JA_solver(x_new_surf, x_surf, density_surf, a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleRho);
 
     /* New density surface is stored in coresponding x surface*/
     std::swap(x_surf, density_surf);
@@ -254,18 +308,80 @@ void FluidGpu::diffuse_velocity(float dt)
     std::swap(x_surf, v_surf);
 }
 
+void FluidGpu::project(float dt)
+{
+    cudaError_t err;
+    int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
+    dim3 blocks(blocks_per_axis, blocks_per_axis);
+
+    int mod = ((N + 2) * (N + 2)) % 128;
+    int blc_bd_task = ((N + 2) * (N + 2)) / 128 + (mod != 0 ? 1 : 0);
+    dim3 blocks_for_bd_task(blc_bd_task);
+
+    prepare_projection_surfaces_device<<<blocks, dim3(32, 32)>>>(
+        u_surf, v_surf,
+        divergence_surf,
+        p_surf, N);
+
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
+
+    /* Boundary condition */
+    handle_rho_bounderies_device<<<blocks_for_bd_task, dim3(128)>>>(divergence_surf, N);
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
+
+    handle_rho_bounderies_device<<<blocks_for_bd_task, dim3(128)>>>(p_surf, N);
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
+
+    solve_laplace_eq_JA_solver(x_surf, divergence_surf, p_surf, 1.0, 4.0, BoundaryHandleEnum::HandleRho);
+
+    std::swap(p_surf, x_surf);
+
+    apply_projection_surface_device<<<blocks, dim3(32, 32)>>>(
+        u_surf, v_surf, p_surf,
+        x_surf, x_new_surf, N, h);
+
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
+
+    std::swap(u_surf, x_surf);
+    std::swap(v_surf, x_new_surf);
+
+    /* Handle boundary conditions */
+    handle_u_bounderies_device<<<blocks_for_bd_task, dim3(128)>>>(u_surf, N);
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
+
+    handle_v_bounderies_device<<<blocks_for_bd_task, dim3(128)>>>(v_surf, N);
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
+}
+
 void FluidGpu::advect_density(float dt)
 {
     cudaError_t err;
     int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
     dim3 blocks(blocks_per_axis, blocks_per_axis);
 
-    advect_field_device<<<blocks, dim3(32, 32)>>>(u_surf, v_surf, density_surf, x_surf, N, h, dt);
+    int mod = ((N + 2) * (N + 2)) % 128;
+    int blc_bd_task = ((N + 2) * (N + 2)) / 128 + (mod != 0 ? 1 : 0);
+    dim3 blocks_for_bd_task(blc_bd_task);
+
+    advect_field_device<<<blocks, dim3(32, 32)>>>(
+        u_surf, v_surf, density_surf,
+        x_surf, N, h, dt);
 
     err = cudaGetLastError();
     CUDA_ERR_CHECK(err);
 
     std::swap(x_surf, density_surf);
+
+    /* !!! HANDLE BOUNDARY CONDITION !!! */
+    handle_rho_bounderies_device<<<blocks_for_bd_task, dim3(128)>>>(density_surf, N);
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
 }
 
 void FluidGpu::advect_velocity(float dt)
@@ -274,12 +390,18 @@ void FluidGpu::advect_velocity(float dt)
     int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
     dim3 blocks(blocks_per_axis, blocks_per_axis);
 
-    advect_field_device<<<blocks, dim(32, 32)>>>(u_surf, v_surf, u_surf, x_surf, N, h, dt);
+    int mod = ((N + 2) * (N + 2)) % 128;
+    int blc_bd_task = ((N + 2) * (N + 2)) / 128 + (mod != 0 ? 1 : 0);
+    dim3 blocks_for_bd_task(blc_bd_task);
+
+    advect_field_device<<<blocks, dim3(32, 32)>>>(u_surf, v_surf, u_surf, x_surf, N, h, dt);
 
     err = cudaGetLastError();
     CUDA_ERR_CHECK(err);
 
-    advect_field_device<<<blocks, dim(32, 32)>>>(u_surf, v_surf, v_surf, x_new_surf, N, h, dt);
+    advect_field_device<<<blocks, dim3(32, 32)>>>(
+        u_surf, v_surf, v_surf,
+        x_new_surf, N, h, dt);
 
     err = cudaGetLastError();
     CUDA_ERR_CHECK(err);
@@ -288,6 +410,16 @@ void FluidGpu::advect_velocity(float dt)
     std::swap(x_new_surf, v_surf);
 
     /* !!! HANDLE BOUNDARY CONDITION !!! */
+
+    /* U boundary condition */
+    handle_u_bounderies_device<<<blocks_for_bd_task, dim3(128)>>>(u_surf, N);
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
+
+    /* V boundary condition */
+    handle_v_bounderies_device<<<blocks_for_bd_task, dim3(128)>>>(v_surf, N);
+    err = cudaGetLastError();
+    CUDA_ERR_CHECK(err);
 }
 
 void FluidGpu::solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new, cudaSurfaceObject_t x, cudaSurfaceObject_t b, float a, float c, enum BoundaryHandleEnum e)
