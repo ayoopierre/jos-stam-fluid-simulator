@@ -17,20 +17,20 @@ class FluidCpu : public Fluid
 public:
     FluidCpu(size_t N);
 
-    inline void step(double dt)
+    inline void step(float dt)
     {
         apply_sources(dt);
         density_step(dt);
         velocity_step(dt);
     }
 
-    inline void density_step(double dt)
+    inline void density_step(float dt)
     {
         diffuse_density(dt);
         advect_density(dt);
     }
 
-    inline void velocity_step(double dt)
+    inline void velocity_step(float dt)
     {
         diffues_velocity(dt);
         project();
@@ -38,17 +38,17 @@ public:
         project();
     }
 
-    inline void add_fluid(int x, int y, double val)
+    inline void add_fluid(int x, int y, float val)
     {
         density[at(x, y)] += val;
     }
 
-    inline void add_u(int x, int y, double val)
+    inline void add_u(int x, int y, float val)
     {
         density[at(x, y)] += val;
     }
 
-    inline void add_v(int x, int y, double val)
+    inline void add_v(int x, int y, float val)
     {
         density[at(x, y)] += val;
     }
@@ -57,7 +57,7 @@ public:
 
     constexpr size_t at(size_t x, size_t y) noexcept { return y * (N + 2) + x; };
 
-    constexpr Color heat_color(float t) noexcept
+    constexpr MyColor heat_color(float t) noexcept
     {
         return {
             (unsigned char)(255 * t), // red
@@ -76,40 +76,40 @@ private:
         HandleRho
     };
 
-    void apply_sources(double dt);
-    // void apply_forces(double dt);
-    void diffuse_density(double dt);
-    void diffues_velocity(double dt);
+    void apply_sources(float dt);
+    // void apply_forces(float dt);
+    void diffuse_density(float dt);
+    void diffues_velocity(float dt);
     void project();
-    void advect_field(double dt, double *input_field, double *output_field);
-    void advect_density(double dt);
-    void advect_velocity(double dt);
-    void handle_boundaries(enum BoundaryHandleEnum e, double *data);
+    void advect_field(float dt, float *input_field, float *output_field);
+    void advect_density(float dt);
+    void advect_velocity(float dt);
+    void handle_boundaries(enum BoundaryHandleEnum e, float *data);
 
     /* Gauss-Seidel solver for Laplace equation arising from diffusion terms */
-    void laplace_eq_GS_solver(double *x, double *b, double a, double c, enum BoundaryHandleEnum e);
+    void laplace_eq_GS_solver(float *x, float *b, float a, float c, enum BoundaryHandleEnum e);
     /* Sample discrete field using continous coos, using bilinear interpolation */
-    double sample_field(double x, double y, double *field);
+    float sample_field(float x, float y, float *field);
 
-    std::vector<double> density;
-    std::vector<double> u;
-    std::vector<double> v;
+    std::vector<float> density;
+    std::vector<float> u;
+    std::vector<float> v;
 
-    std::vector<double> new_u;
-    std::vector<double> new_v;
-    std::vector<double> new_density;
+    std::vector<float> new_u;
+    std::vector<float> new_v;
+    std::vector<float> new_density;
 
     std::vector<bool> is_wall;
-    std::vector<double> divergence;
-    std::vector<double> p;
+    std::vector<float> divergence;
+    std::vector<float> p;
 
     size_t N;
 
-    double box_length = 1.0;
-    double h;
+    float box_length = 1.0;
+    float h;
 
-    double diff = 1.01;
-    double visc = 0.01;
+    float diff = 1.01;
+    float visc = 0.01;
 };
 
 #endif

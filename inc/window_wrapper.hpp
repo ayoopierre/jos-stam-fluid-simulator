@@ -26,7 +26,7 @@ public:
         img = GenImageColor(width, height, BLANK);
         tex = LoadTextureFromImage(img);
         pixels = LoadImageColors(img);
-        bitmap = { pixels, this->width, this->height };
+        bitmap = { (MyColor *)pixels, this->width, this->height };
         this->f = f;
         SetTargetFPS(60);
     }

@@ -19,10 +19,10 @@ FluidCpu::FluidCpu(size_t N)
     divergence.resize((N + 2) * (N + 2));
     p.resize((N + 2) * (N + 2));
 
-    // auto l = [](double &v)
-    // { v = (rand() / (double)RAND_MAX) - 0.5; };
+    // auto l = [](float &v)
+    // { v = (rand() / (float)RAND_MAX) - 0.5; };
 
-    auto l1 = [](double &v)
+    auto l1 = [](float &v)
     { v = 0.0; };
     std::for_each(u.begin(), u.end(), l1);
     std::for_each(v.begin(), v.end(), l1);
@@ -36,13 +36,13 @@ FluidCpu::FluidCpu(size_t N)
 
 void FluidCpu::draw_into_bitmap(MyBitmap &bitmap)
 {
-    double minVal = MY_DBL_MAX, maxVal = MY_DBL_MIN;
+    float minVal = MY_DBL_MAX, maxVal = MY_DBL_MIN;
 
     for (int y = 0; y < N + 2; y++)
     {
         for (int x = 0; x < N + 2; x++)
         {
-            double v = density[at(x, y)];
+            float v = density[at(x, y)];
             if (v > maxVal)
                 maxVal = v;
             if (v < minVal)
@@ -54,16 +54,16 @@ void FluidCpu::draw_into_bitmap(MyBitmap &bitmap)
     {
         for (int x = 0; x < bitmap.width; x++)
         {
-            double f_x = box_length * x / (double)bitmap.width;
-            double f_y = box_length * y / (double)bitmap.height;
-            double v = sample_field(f_x, f_y, density.data());
-            double t = (v - minVal) / (maxVal - minVal);
+            float f_x = box_length * x / (float)bitmap.width;
+            float f_y = box_length * y / (float)bitmap.height;
+            float v = sample_field(f_x, f_y, density.data());
+            float t = (v - minVal) / (maxVal - minVal);
             bitmap.bitmap[y * bitmap.width + x] = heat_color(t);
         }
     }
 }
 
-void FluidCpu::apply_sources(double dt)
+void FluidCpu::apply_sources(float dt)
 {
     for (int y = 9 * N / 20; y <= 11 * N / 20; y++)
     {
@@ -73,18 +73,18 @@ void FluidCpu::apply_sources(double dt)
     }
 }
 
-void FluidCpu::diffuse_density(double dt)
+void FluidCpu::diffuse_density(float dt)
 {
-    double a = diff * dt * (1.0 / h) * (1.0 / h);
+    float a = diff * dt * (1.0 / h) * (1.0 / h);
 
     laplace_eq_GS_solver(new_density.data(), density.data(), a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleRho);
 
     std::swap(density, new_density);
 }
 
-void FluidCpu::diffues_velocity(double dt)
+void FluidCpu::diffues_velocity(float dt)
 {
-    double a = visc * dt * (1.0 / h) * (1.0 / h);
+    float a = visc * dt * (1.0 / h) * (1.0 / h);
 
     laplace_eq_GS_solver(new_u.data(), u.data(), a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleU);
     laplace_eq_GS_solver(new_v.data(), v.data(), a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleV);
@@ -125,14 +125,14 @@ void FluidCpu::project()
     handle_boundaries(BoundaryHandleEnum::HandleV, v.data());
 }
 
-void FluidCpu::advect_field(double dt, double *input_field, double *output_field)
+void FluidCpu::advect_field(float dt, float *input_field, float *output_field)
 {
     for (int i = 1; i <= N; i++)
     {
         for (int j = 1; j <= N; j++)
         {
-            double x = i * h - dt * N * u[at(i, j)];
-            double y = j * h - dt * N * v[at(i, j)];
+            float x = i * h - dt * N * u[at(i, j)];
+            float y = j * h - dt * N * v[at(i, j)];
 
             /* Field sampling already clamps point to simulation domain */
             output_field[at(i, j)] = sample_field(x, y, input_field);
@@ -140,14 +140,14 @@ void FluidCpu::advect_field(double dt, double *input_field, double *output_field
     }
 }
 
-void FluidCpu::advect_density(double dt)
+void FluidCpu::advect_density(float dt)
 {
     advect_field(dt, density.data(), new_density.data());
     handle_boundaries(BoundaryHandleEnum::HandleRho, new_density.data());
     std::swap(density, new_density);
 }
 
-void FluidCpu::advect_velocity(double dt)
+void FluidCpu::advect_velocity(float dt)
 {
     advect_field(dt, u.data(), new_u.data());
     advect_field(dt, v.data(), new_v.data());
@@ -159,7 +159,7 @@ void FluidCpu::advect_velocity(double dt)
     std::swap(new_v, v);
 }
 
-void FluidCpu::handle_boundaries(enum BoundaryHandleEnum e, double *data)
+void FluidCpu::handle_boundaries(enum BoundaryHandleEnum e, float *data)
 {
     switch (e)
     {
@@ -209,12 +209,12 @@ void FluidCpu::handle_boundaries(enum BoundaryHandleEnum e, double *data)
     data[at(N + 1, N + 1)] = (data[at(N, N + 1)] + data[at(N + 1, N)]) / 2.0;
 }
 
-double FluidCpu::sample_field(double x, double y, double *field)
+float FluidCpu::sample_field(float x, float y, float *field)
 {
     // clamp coordinates to the interior cell-centers range: [h/2, N*h - h/2]
-    double halfh = 0.5 * h;
-    double xmax = N * h - halfh;
-    double ymax = N * h - halfh;
+    float halfh = 0.5 * h;
+    float xmax = N * h - halfh;
+    float ymax = N * h - halfh;
 
     if (x < halfh)
         x = halfh;
@@ -226,8 +226,8 @@ double FluidCpu::sample_field(double x, double y, double *field)
         y = ymax;
 
     // convert to grid coordinates (1..N in cell indices, but 0..N+1 in array)
-    double gx = x / h;
-    double gy = y / h;
+    float gx = x / h;
+    float gy = y / h;
 
     int i0 = (int)floor(gx); // base index
     int j0 = (int)floor(gy);
@@ -235,8 +235,8 @@ double FluidCpu::sample_field(double x, double y, double *field)
     int j1 = j0 + 1;
 
     // fractional parts
-    double sx = gx - i0;
-    double sy = gy - j0;
+    float sx = gx - i0;
+    float sy = gy - j0;
 
     // clamp indices to valid array bounds [0 .. N+1]
     i0 = std::clamp(i0, 0, (int)N + 1);
@@ -245,12 +245,12 @@ double FluidCpu::sample_field(double x, double y, double *field)
     j1 = std::clamp(j1, 0, (int)N + 1);
 
     // bilinear interpolation
-    double f00 = field[at(i0, j0)];
-    double f01 = field[at(i0, j1)];
-    double f10 = field[at(i1, j0)];
-    double f11 = field[at(i1, j1)];
+    float f00 = field[at(i0, j0)];
+    float f01 = field[at(i0, j1)];
+    float f10 = field[at(i1, j0)];
+    float f11 = field[at(i1, j1)];
 
-    double res =
+    float res =
         (1.0 - sx) * (1.0 - sy) * f00 +
         (1.0 - sx) * sy * f01 +
         sx * (1.0 - sy) * f10 +
@@ -259,7 +259,7 @@ double FluidCpu::sample_field(double x, double y, double *field)
     return res;
 }
 
-void FluidCpu::laplace_eq_GS_solver(double *x, double *b, double a, double c, enum BoundaryHandleEnum e)
+void FluidCpu::laplace_eq_GS_solver(float *x, float *b, float a, float c, enum BoundaryHandleEnum e)
 {
     for (int iter = 0; iter < 20; iter++)
     {

@@ -7,7 +7,7 @@ class Fluid
 {
 public:
     Fluid() = default;
-    virtual void step(double dt) = 0;
+    virtual void step(float dt) = 0;
     virtual void draw_into_bitmap(MyBitmap& bitmap) = 0;
 };
 
