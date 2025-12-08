@@ -25,9 +25,22 @@ public:
     }
 
 private:
+    enum class BoundaryHandleEnum
+    {
+        HandleU,
+        HandleV,
+        HandleRho
+    };
+
+    void diffuse_density(float dt);
+    void diffuse_velocity(float dt);
+    void project(float dt);
+    void advect_density(float dt);
+    void advect_velocity(float dt);
+
     void solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new,
                                     cudaSurfaceObject_t x, cudaSurfaceObject_t b,
-                                    float a, float c);
+                                    float a, float c, enum BoundaryHandleEnum e);
     void prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t *surf, cudaArray_t *arr);
 
     /* */
@@ -38,7 +51,8 @@ private:
     cudaResourceDesc u_desc;
     cudaResourceDesc v_desc;
 
-    cudaResourceDesc temp_desc;
+    cudaResourceDesc x_desc;
+    cudaResourceDesc x_new_desc;
 
     cudaResourceDesc divergence_desc;
     cudaResourceDesc p_desc;
@@ -48,20 +62,22 @@ private:
     cudaSurfaceObject_t u_surf;
     cudaSurfaceObject_t v_surf;
 
-    cudaSurfaceObject_t temp_surf;
+    cudaSurfaceObject_t x_surf;
+    cudaSurfaceObject_t x_new_surf;
 
     cudaSurfaceObject_t divergence_surf;
     cudaSurfaceObject_t p_surf;
 
     /* Array handles */
-    cudaArray_t *density_arr;
-    cudaArray_t *u_arr;
-    cudaArray_t *v_arr;
+    cudaArray_t density_arr;
+    cudaArray_t u_arr;
+    cudaArray_t v_arr;
 
-    cudaArray_t *temp_arr;
+    cudaArray_t x_arr;
+    cudaArray_t x_new_arr;
 
-    cudaArray_t *divergence_arr;
-    cudaArray_t *p_arr;
+    cudaArray_t divergence_arr;
+    cudaArray_t p_arr;
 
     /* Fluid params */
     size_t N;
