@@ -262,7 +262,7 @@ __global__ static void advect_field_device(
 }
 // clang-format on
 
-FluidGpu::FluidGpu(size_t N)
+__host__ FluidGpu::FluidGpu(size_t N)
 {
     this->N = N;
     h = box_length / N;
@@ -285,7 +285,7 @@ FluidGpu::FluidGpu(size_t N)
     prepare_surface(&p_desc, &p_surf, &p_arr);
 }
 
-void FluidGpu::diffuse_density(float dt)
+__host__ void FluidGpu::diffuse_density(float dt)
 {
     float a = diff * dt * (1.0 / h) * (1.0 / h);
 
@@ -295,7 +295,7 @@ void FluidGpu::diffuse_density(float dt)
     std::swap(x_surf, density_surf);
 }
 
-void FluidGpu::diffuse_velocity(float dt)
+__host__ void FluidGpu::diffuse_velocity(float dt)
 {
     float a = visc * dt * (1.0 / h) * (1.0 / h);
 
@@ -308,7 +308,7 @@ void FluidGpu::diffuse_velocity(float dt)
     std::swap(x_surf, v_surf);
 }
 
-void FluidGpu::project(float dt)
+__host__ void FluidGpu::project(float dt)
 {
     cudaError_t err;
     int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
@@ -359,7 +359,7 @@ void FluidGpu::project(float dt)
     CUDA_ERR_CHECK(err);
 }
 
-void FluidGpu::advect_density(float dt)
+__host__  void FluidGpu::advect_density(float dt)
 {
     cudaError_t err;
     int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
@@ -384,7 +384,7 @@ void FluidGpu::advect_density(float dt)
     CUDA_ERR_CHECK(err);
 }
 
-void FluidGpu::advect_velocity(float dt)
+__host__ void FluidGpu::advect_velocity(float dt)
 {
     cudaError_t err;
     int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
@@ -422,7 +422,7 @@ void FluidGpu::advect_velocity(float dt)
     CUDA_ERR_CHECK(err);
 }
 
-void FluidGpu::solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new, cudaSurfaceObject_t x, cudaSurfaceObject_t b, float a, float c, enum BoundaryHandleEnum e)
+__host__ void FluidGpu::solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new, cudaSurfaceObject_t x, cudaSurfaceObject_t b, float a, float c, enum BoundaryHandleEnum e)
 {
     cudaError_t err;
     int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
@@ -462,7 +462,7 @@ void FluidGpu::solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new, cudaSurface
     }
 }
 
-void FluidGpu::prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t *surf, cudaArray_t *arr)
+__host__ void FluidGpu::prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t *surf, cudaArray_t *arr)
 {
     cudaError_t err;
 

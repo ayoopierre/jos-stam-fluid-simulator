@@ -1,5 +1,5 @@
-#ifndef FLUID_HPP
-#define FLUID_HPP
+#ifndef FLUID_CPU_HPP
+#define FLUID_CPU_HPP
 
 #define GS_ITER 30
 

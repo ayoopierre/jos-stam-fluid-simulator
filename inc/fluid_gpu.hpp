@@ -1,5 +1,5 @@
-#ifndef FLUID_HPP
-#define FLUID_HPP
+#ifndef FLUID_GPU_HPP
+#define FLUID_GPU_HPP
 
 #define GS_ITER 30
 
@@ -18,10 +18,14 @@ class Window;
 class FluidGpu : public Fluid
 {
 public:
-    FluidGpu(size_t N);
+    __host__ FluidGpu(size_t N);
 
-    inline void step(float dt)
+    __host__ inline void step(float dt)
     {
+    }
+
+    __host__ inline void draw_into_bitmap(MyBitmap &bitmap){
+
     }
 
 private:
@@ -32,16 +36,16 @@ private:
         HandleRho
     };
 
-    void diffuse_density(float dt);
-    void diffuse_velocity(float dt);
-    void project(float dt);
-    void advect_density(float dt);
-    void advect_velocity(float dt);
+    __host__ void diffuse_density(float dt);
+    __host__ void diffuse_velocity(float dt);
+    __host__ void project(float dt);
+    __host__ void advect_density(float dt);
+    __host__ void advect_velocity(float dt);
 
-    void solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new,
+    __host__ void solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new,
                                     cudaSurfaceObject_t x, cudaSurfaceObject_t b,
                                     float a, float c, enum BoundaryHandleEnum e);
-    void prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t *surf, cudaArray_t *arr);
+    __host__ void prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t *surf, cudaArray_t *arr);
 
     /* */
     cudaChannelFormatDesc channel_desc;
