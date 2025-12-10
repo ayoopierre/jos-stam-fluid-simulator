@@ -14,6 +14,13 @@ for SM allocation), but not to make scheduler overhead
 to large (small blocks like 32 threads - 1 warp - mean
 increase scheduler overhead)
 */
+__global__ static void apply_sources_device(
+    cudaSurfaceObject_t rho_surf,
+    cudaSurfaceObject_t u_surf)
+{
+    
+}
+
 __global__ static void handle_rho_bounderies_device(cudaSurfaceObject_t rho_surf, int N)
 {
     int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
@@ -271,9 +278,8 @@ __global__ static void draw_heatmap_device(
         float y = len * j / (float)height;
         float v = bilerp_device(density_surf, x, y, N, h);
         float t = (v - minVal) / (maxVal - minVal);
-        unsigned char r = (unsigned char)(0xFF * t);
-        unsigned int col = (0xFF << 24) | (r << 16) | (r << 8) | 0xFF;
-        surf2Dwrite<unsigned int>(col, texture, i * sizeof(float), j);
+        uchar4 col = make_uchar4(255 * t, 255 * t, 255 * t, 255);
+        surf2Dwrite(col, texture, i * sizeof(uchar4), j);
     }
 }
 
@@ -318,48 +324,47 @@ __host__ FluidGpu::FluidGpu(size_t N)
 
 __host__ bool FluidGpu::draw_into_bitmap(MyBitmap &bitmap)
 {
-    // cudaError_t err;
-    // GLuint texture_id = bitmap.texture_id;
-    // int width = bitmap.width;
-    // int height = bitmap.height;
+    cudaError_t err;
+    GLuint texture_id = bitmap.texture_id;
+    int width = bitmap.width;
+    int height = bitmap.height;
 
-    // err = cudaGraphicsGLRegisterImage(&cuda_graphics_resource, 0, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsSurfaceLoadStore);
+    err = cudaGraphicsGLRegisterImage(&cuda_graphics_resource, texture_id, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsSurfaceLoadStore);
+    CUDA_ERR_CHECK(err);
+
+    err = cudaGraphicsMapResources(1, &cuda_graphics_resource);
+    CUDA_ERR_CHECK(err);
+
+    cudaArray_t tex_arr;
+    err = cudaGraphicsSubResourceGetMappedArray(&tex_arr, cuda_graphics_resource, 0, 0);
+    CUDA_ERR_CHECK(err);
+
+    cudaResourceDesc temp_resource;
+    memset(&temp_resource, 0, sizeof(temp_resource));
+    temp_resource.resType = cudaResourceTypeArray;
+    temp_resource.res.array.array = tex_arr;
+
+    cudaSurfaceObject_t temp_surface;
+    err = cudaCreateSurfaceObject(&temp_surface, &temp_resource);
+    CUDA_ERR_CHECK(err);
+
+    int x_dim = (width + 31) / 32;
+    int y_dim = (height + 31) / 32;
+    draw_heatmap_device<<<dim3(x_dim, y_dim), dim3(32, 32)>>>(
+        density_surf, temp_surface,
+        N, h, width, height,
+        box_length, 0.0f, 1.0f);
+
+    // err = cudaGetLastError();
     // CUDA_ERR_CHECK(err);
+    err = cudaDeviceSynchronize();
+    CUDA_ERR_CHECK(err);
 
-    // err = cudaGraphicsMapResources(1, &cuda_graphics_resource);
-    // CUDA_ERR_CHECK(err);
+    err = cudaDestroySurfaceObject(temp_surface);
+    CUDA_ERR_CHECK(err);
 
-    // cudaArray_t tex_arr;
-    // err = cudaGraphicsSubResourceGetMappedArray(&tex_arr, cuda_graphics_resource, 0, 0);
-    // CUDA_ERR_CHECK(err);
-
-    // cudaResourceDesc temp_resource;
-    // memset(&temp_resource, 0, sizeof(temp_resource));
-    // temp_resource.resType = cudaResourceTypeArray;
-    // temp_resource.res.array.array = tex_arr;
-
-    // cudaSurfaceObject_t temp_surface;
-    // err = cudaCreateSurfaceObject(&temp_surface, &temp_resource);
-    // CUDA_ERR_CHECK(err);
-
-    // int x_dim = (width + 31) / 32;
-    // int y_dim = (height + 31) / 32;
-    // draw_red_device<<<dim3(x_dim, y_dim), dim3(32, 32)>>>(
-    //     density_surf, temp_surface,
-    //     N, h, width, height,
-    //     box_length, 0.0f, 1.0f);
-
-    // // err = cudaGetLastError();
-    // // CUDA_ERR_CHECK(err);
-    // err = cudaDeviceSynchronize();
-    // printf("err %d\n", err);
-    // CUDA_ERR_CHECK(err);
-
-    // err = cudaDestroySurfaceObject(temp_surface);
-    // CUDA_ERR_CHECK(err);
-
-    // err = cudaGraphicsUnmapResources(1, &cuda_graphics_resource);
-    // CUDA_ERR_CHECK(err);
+    err = cudaGraphicsUnmapResources(1, &cuda_graphics_resource);
+    CUDA_ERR_CHECK(err);
 
     /* This function modifies texture directly */
     return false;
