@@ -6,16 +6,15 @@
 #include "window_wrapper.hpp"
 
 int main(void){
-    FluidCpu f(200);
-    FluidGpu f2(200);
-    Window w(800, 800, &f);
-
-    f2.step(0.0f);
+    FluidCpu f(400);
+    FluidGpu f2(2000);
+    Window w(800, 800, &f2);
 
     while (!w.shouldClose())
     {
-        f.step(0.0005);
+        f2.step(0.0005);
+        // std::printf("Simulation step done\n");
         w.update();
-        w.handle_input();
+        // w.handle_input();
     }   
 }

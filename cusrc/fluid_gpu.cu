@@ -1,13 +1,9 @@
 #include "fluid_gpu.hpp"
 
-#include <cooperative_groups.h>
+#include <windows.h>
+#include <gl/GL.h>
 
-#define CUDA_ERR_CHECK(err)                                                    \
-    if (err < 0)                                                               \
-    {                                                                          \
-        printf("%s:%d - %s\n", __FUNCTION__, __LINE__, cudaGetErrorName(err)); \
-        exit(1);                                                               \
-    }
+#include <cuda_gl_interop.h>
 
 // clang-format off
 
@@ -20,52 +16,52 @@ increase scheduler overhead)
 */
 __global__ static void handle_rho_bounderies_device(cudaSurfaceObject_t rho_surf, int N)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
 
-    if(i <= N){
-        float x_1_i = surf2Dread<float>(rho_surf, 1, i);
-        float x_N_i = surf2Dread<float>(rho_surf, N, i);
-        float y_i_1 = surf2Dread<float>(rho_surf, i, 1);
-        float y_i_N = surf2Dread<float>(rho_surf, i, N);
+    if(i <= 1 && i <= N){
+        float x_1_i = surf2Dread<float>(rho_surf, 1 * sizeof(float), i);
+        float x_N_i = surf2Dread<float>(rho_surf, N * sizeof(float), i);
+        float y_i_1 = surf2Dread<float>(rho_surf, i * sizeof(float), 1);
+        float y_i_N = surf2Dread<float>(rho_surf, i * sizeof(float), N);
 
-        surf2Dwrite<float>(x_1_i, rho_surf, 0, i);
-        surf2Dwrite<float>(x_N_i, rho_surf, N, i);
-        surf2Dwrite<float>(y_i_1, rho_surf, i, 0);
-        surf2Dwrite<float>(y_i_N, rho_surf, i, N);
+        surf2Dwrite<float>(x_1_i, rho_surf, 0 * sizeof(float), i);
+        surf2Dwrite<float>(x_N_i, rho_surf, N * sizeof(float), i);
+        surf2Dwrite<float>(y_i_1, rho_surf, i * sizeof(float), 0);
+        surf2Dwrite<float>(y_i_N, rho_surf, i * sizeof(float), N);
     }
 }
 
 __global__ static void handle_u_bounderies_device(cudaSurfaceObject_t u_surf, int N)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
 
     if(i <= N){
-        float x_1_i = surf2Dread<float>(u_surf, 1, i);
-        float x_N_i = surf2Dread<float>(u_surf, N, i);
-        float y_i_1 = surf2Dread<float>(u_surf, i, 1);
-        float y_i_N = surf2Dread<float>(u_surf, i, N);
+        float x_1_i = surf2Dread<float>(u_surf, 1 * sizeof(float), i);
+        float x_N_i = surf2Dread<float>(u_surf, N * sizeof(float), i);
+        float y_i_1 = surf2Dread<float>(u_surf, i * sizeof(float), 1);
+        float y_i_N = surf2Dread<float>(u_surf, i * sizeof(float), N);
 
-        surf2Dwrite<float>(-x_1_i, u_surf, 0, i);
-        surf2Dwrite<float>(-x_N_i, u_surf, N, i);
-        surf2Dwrite<float>(y_i_1, u_surf, i, 0);
-        surf2Dwrite<float>(y_i_N, u_surf, i, N);
+        surf2Dwrite<float>(-x_1_i, u_surf, 0 * sizeof(float), i);
+        surf2Dwrite<float>(-x_N_i, u_surf, N * sizeof(float), i);
+        surf2Dwrite<float>(y_i_1, u_surf, i * sizeof(float), 0);
+        surf2Dwrite<float>(y_i_N, u_surf, i * sizeof(float), N);
     }
 }
 
 __global__ static void handle_v_bounderies_device(cudaSurfaceObject_t v_surf, int N)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
 
     if(i <= N){
-        float x_1_i = surf2Dread<float>(v_surf, 1, i);
-        float x_N_i = surf2Dread<float>(v_surf, N, i);
-        float y_i_1 = surf2Dread<float>(v_surf, i, 1);
-        float y_i_N = surf2Dread<float>(v_surf, i, N);
+        float x_1_i = surf2Dread<float>(v_surf, 1 * sizeof(float), i);
+        float x_N_i = surf2Dread<float>(v_surf, N * sizeof(float), i);
+        float y_i_1 = surf2Dread<float>(v_surf, i * sizeof(float), 1);
+        float y_i_N = surf2Dread<float>(v_surf, i * sizeof(float), N);
 
-        surf2Dwrite<float>(x_1_i, v_surf, 0, i);
-        surf2Dwrite<float>(x_N_i, v_surf, N, i);
-        surf2Dwrite<float>(-y_i_1, v_surf, i, 0);
-        surf2Dwrite<float>(-y_i_N, v_surf, i, N);
+        surf2Dwrite<float>(x_1_i, v_surf, 0 * sizeof(float), i);
+        surf2Dwrite<float>(x_N_i, v_surf, N * sizeof(float), i);
+        surf2Dwrite<float>(-y_i_1, v_surf, i * sizeof(float), 0);
+        surf2Dwrite<float>(-y_i_N, v_surf, i * sizeof(float), N);
     }
 }
 
@@ -86,40 +82,40 @@ __global__ static void laplace_eq_solver_step_device(
     int i = blockIdx.x * blockDim.x + threadIdx.x + 1;
     int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
 
-    /*
-    We have shmem (threads.x + 2) * (threads.y + 2)
-    and since we got 1024 threads per group we have
-    8Kb of shared memory for tile caching which should
-    fit in any GPU L1 cache.
-    */
-    extern __shared__ float tile[];
-    int w = blockDim.x + 2;
-    int local_idx = (threadIdx.y + 1) * w + (threadIdx.x);
-
-    /* Each thread within group will load into tile */
-    tile[local_idx] = surf2Dread<float>(x_surf, i, j);
-
-    if(threadIdx.x == 0)
-        tile[local_idx - 1] = surf2Dread<float>(x_surf, i - 1, j);
-    if(threadIdx.x == blockDim.x - 1)
-        tile[local_idx + 1] = surf2Dread<float>(x_surf, i + 1, j);
-    if(threadIdx.y == 0)
-        tile[local_idx - w] = surf2Dread<float>(x_surf, i, j - 1);
-    if(threadIdx.y == blockDim.y - 1)
-        tile[local_idx + w] = surf2Dread<float>(x_surf, i, j + 1);
-
-    __syncthreads();
-
     if(i <= N && j <= N){
+        /*
+        We have shmem (threads.x + 2) * (threads.y + 2)
+        and since we got 1024 threads per group we have
+        8Kb of shared memory for tile caching which should
+        fit in any GPU L1 cache.
+        */
+        extern __shared__ float tile[];
+        int w = blockDim.x + 2;
+        int local_idx = (threadIdx.y + 1) * w + (threadIdx.x);
+
+        /* Each thread within group will load into tile */
+        tile[local_idx] = surf2Dread<float>(x_surf, i * sizeof(float), j);
+
+        if(threadIdx.x == 0)
+            tile[local_idx - 1] = surf2Dread<float>(x_surf, (i - 1) * sizeof(float), j);
+        if(threadIdx.x == blockDim.x - 1)
+            tile[local_idx + 1] = surf2Dread<float>(x_surf, (i + 1) * sizeof(float), j);
+        if(threadIdx.y == 0)
+            tile[local_idx - w] = surf2Dread<float>(x_surf, i * sizeof(float), j - 1);
+        if(threadIdx.y == blockDim.y - 1)
+            tile[local_idx + w] = surf2Dread<float>(x_surf, i * sizeof(float), j + 1);
+
+        __syncthreads();
+
         float s = tile[local_idx - 1] + tile[local_idx + 1] +
             tile[local_idx + w] + tile[local_idx - w];
-        
-        float b = surf2Dread<float>(b_surf, i, j);
+            
+        float b = surf2Dread<float>(b_surf, i * sizeof(float), j);
 
         float val = (b + a * s) / c;
 
         surf2Dwrite<float>(val, x_next_surf, i * sizeof(float), j, cudaSurfaceBoundaryMode::cudaBoundaryModeZero);
-    }
+    }   
 }
 
 __global__ static void prepare_projection_surfaces_device(
@@ -134,15 +130,15 @@ __global__ static void prepare_projection_surfaces_device(
     /* TODO: Add similr caching as in the Jacobi solver */
 
     if(i <= N && j <= N){
-        float u_i_p1 = surf2Dread<float>(u_surf, i + 1, j);
-        float u_i_m1 = surf2Dread<float>(u_surf, i - 1, j);
-        float v_j_p1 = surf2Dread<float>(v_surf, i, j + 1);
-        float v_j_m1 = surf2Dread<float>(v_surf, i, j - 1);
+        float u_i_p1 = surf2Dread<float>(u_surf, (i + 1) * sizeof(float), j);
+        float u_i_m1 = surf2Dread<float>(u_surf, (i - 1) * sizeof(float), j);
+        float v_j_p1 = surf2Dread<float>(v_surf, i * sizeof(float), j + 1);
+        float v_j_m1 = surf2Dread<float>(v_surf, i * sizeof(float), j - 1);
 
         float val = -0.5f * (u_i_p1 - u_i_m1 + v_j_p1 - v_j_m1);
-        surf2Dwrite<float>(val, divergence_surf, i, j);
+        surf2Dwrite<float>(val, divergence_surf, i * sizeof(float), j);
 
-        surf2Dwrite<float>(0.0f, p_surf, i, j);
+        surf2Dwrite<float>(0.0f, p_surf, i * sizeof(float), j);
     }
 }
 
@@ -160,19 +156,19 @@ __global__ static void apply_projection_surface_device(
     /* TODO: Add caching */
 
     if(i <= N && j <= N){
-        float p_i_p1 = surf2Dread<float>(p_surf, i + 1, j);
-        float p_i_m1 = surf2Dread<float>(p_surf, i - 1, j);
-        float p_j_p1 = surf2Dread<float>(p_surf, i, j + 1);
-        float p_j_m1 = surf2Dread<float>(p_surf, i, j - 1);
+        float p_i_p1 = surf2Dread<float>(p_surf, (i + 1) * sizeof(float), j);
+        float p_i_m1 = surf2Dread<float>(p_surf, (i - 1) * sizeof(float), j);
+        float p_j_p1 = surf2Dread<float>(p_surf, i * sizeof(float), j + 1);
+        float p_j_m1 = surf2Dread<float>(p_surf, i * sizeof(float), j - 1);
 
-        float u = surf2Dread<float>(u_surf, i, j);
-        float v = surf2Dread<float>(v_surf, i, j);
+        float u = surf2Dread<float>(u_surf, i * sizeof(float), j);
+        float v = surf2Dread<float>(v_surf, i * sizeof(float), j);
 
         u = u - 0.5 * (p_i_p1 - p_i_m1) / h;
         v = v - 0.5 * (p_j_p1 - p_j_m1) / h;
 
-        surf2Dwrite<float>(u, x_surf, i, j);
-        surf2Dwrite<float>(v, x_new_surf, i, j);
+        surf2Dwrite<float>(u, x_surf, i * sizeof(float), j);
+        surf2Dwrite<float>(v, x_new_surf, i * sizeof(float), j);
     }
 }
 
@@ -218,10 +214,10 @@ __device__ static float bilerp_device(
     j0 = clamp_device(j0, 0, (int)N + 1);
     j1 = clamp_device(j1, 0, (int)N + 1);
 
-    float f00 = surf2Dread<float>(src_surf, i0, j0);
-    float f01 = surf2Dread<float>(src_surf, i0, j1);
-    float f10 = surf2Dread<float>(src_surf, i1, j0);
-    float f11 = surf2Dread<float>(src_surf, i1, j1);
+    float f00 = surf2Dread<float>(src_surf, i0 * sizeof(float), j0);
+    float f01 = surf2Dread<float>(src_surf, i0 * sizeof(float), j1);
+    float f10 = surf2Dread<float>(src_surf, i1 * sizeof(float), j0);
+    float f11 = surf2Dread<float>(src_surf, i1 * sizeof(float), j1);
 
     float res =
         (1.0 - sx) * (1.0 - sy) * f00 +
@@ -249,8 +245,8 @@ __global__ static void advect_field_device(
     int j = blockIdx.y * blockDim.y + threadIdx.y + 1;
 
     if(i <= N && j <= N){
-        float u = surf2Dread<float>(u_surf, i, j);
-        float v = surf2Dread<float>(v_surf, i, j);
+        float u = surf2Dread<float>(u_surf, i * sizeof(float), j);
+        float v = surf2Dread<float>(v_surf, i * sizeof(float), j);
 
         float x = i * h - dt * N * u;
         float y = j * h - dt * N * v;
@@ -258,6 +254,41 @@ __global__ static void advect_field_device(
         float val = bilerp_device(source_surf, x, y, N, h);
 
         surf2Dwrite<float>(val, dest_surf, i * sizeof(float), j, cudaSurfaceBoundaryMode::cudaBoundaryModeZero);
+    }
+}
+
+__global__ static void draw_heatmap_device(
+    cudaSurfaceObject_t density_surf,
+    cudaSurfaceObject_t texture, int N,
+    float h, int width, int height,
+    float len, float minVal, float maxVal)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(i < width && j < height){
+        float x = len * i / (float)width;
+        float y = len * j / (float)height;
+        float v = bilerp_device(density_surf, x, y, N, h);
+        float t = (v - minVal) / (maxVal - minVal);
+        unsigned char r = (unsigned char)(0xFF * t);
+        unsigned int col = (0xFF << 24) | (r << 16) | (r << 8) | 0xFF;
+        surf2Dwrite<unsigned int>(col, texture, i * sizeof(float), j);
+    }
+}
+
+__global__ static void draw_red_device(
+    cudaSurfaceObject_t density_surf,
+    cudaSurfaceObject_t texture, int N,
+    float h, int width, int height,
+    float len, float minVal, float maxVal)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    
+    if(i < width && j < height){
+        uchar4 col = make_uchar4(255, 0, 0, 255);
+        surf2Dwrite(col, texture, i * sizeof(uchar4), j);
     }
 }
 // clang-format on
@@ -283,6 +314,55 @@ __host__ FluidGpu::FluidGpu(size_t N)
 
     prepare_surface(&divergence_desc, &divergence_surf, &divergence_arr);
     prepare_surface(&p_desc, &p_surf, &p_arr);
+}
+
+__host__ bool FluidGpu::draw_into_bitmap(MyBitmap &bitmap)
+{
+    // cudaError_t err;
+    // GLuint texture_id = bitmap.texture_id;
+    // int width = bitmap.width;
+    // int height = bitmap.height;
+
+    // err = cudaGraphicsGLRegisterImage(&cuda_graphics_resource, 0, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsSurfaceLoadStore);
+    // CUDA_ERR_CHECK(err);
+
+    // err = cudaGraphicsMapResources(1, &cuda_graphics_resource);
+    // CUDA_ERR_CHECK(err);
+
+    // cudaArray_t tex_arr;
+    // err = cudaGraphicsSubResourceGetMappedArray(&tex_arr, cuda_graphics_resource, 0, 0);
+    // CUDA_ERR_CHECK(err);
+
+    // cudaResourceDesc temp_resource;
+    // memset(&temp_resource, 0, sizeof(temp_resource));
+    // temp_resource.resType = cudaResourceTypeArray;
+    // temp_resource.res.array.array = tex_arr;
+
+    // cudaSurfaceObject_t temp_surface;
+    // err = cudaCreateSurfaceObject(&temp_surface, &temp_resource);
+    // CUDA_ERR_CHECK(err);
+
+    // int x_dim = (width + 31) / 32;
+    // int y_dim = (height + 31) / 32;
+    // draw_red_device<<<dim3(x_dim, y_dim), dim3(32, 32)>>>(
+    //     density_surf, temp_surface,
+    //     N, h, width, height,
+    //     box_length, 0.0f, 1.0f);
+
+    // // err = cudaGetLastError();
+    // // CUDA_ERR_CHECK(err);
+    // err = cudaDeviceSynchronize();
+    // printf("err %d\n", err);
+    // CUDA_ERR_CHECK(err);
+
+    // err = cudaDestroySurfaceObject(temp_surface);
+    // CUDA_ERR_CHECK(err);
+
+    // err = cudaGraphicsUnmapResources(1, &cuda_graphics_resource);
+    // CUDA_ERR_CHECK(err);
+
+    /* This function modifies texture directly */
+    return false;
 }
 
 __host__ void FluidGpu::diffuse_density(float dt)
@@ -311,11 +391,10 @@ __host__ void FluidGpu::diffuse_velocity(float dt)
 __host__ void FluidGpu::project(float dt)
 {
     cudaError_t err;
-    int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
+    int blocks_per_axis = (N + 31) / 32;
     dim3 blocks(blocks_per_axis, blocks_per_axis);
 
-    int mod = ((N + 2) * (N + 2)) % 128;
-    int blc_bd_task = ((N + 2) * (N + 2)) / 128 + (mod != 0 ? 1 : 0);
+    int blc_bd_task = ((N + 2) * (N + 2) + 127) / 128;
     dim3 blocks_for_bd_task(blc_bd_task);
 
     prepare_projection_surfaces_device<<<blocks, dim3(32, 32)>>>(
@@ -359,14 +438,13 @@ __host__ void FluidGpu::project(float dt)
     CUDA_ERR_CHECK(err);
 }
 
-__host__  void FluidGpu::advect_density(float dt)
+__host__ void FluidGpu::advect_density(float dt)
 {
     cudaError_t err;
-    int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
+    int blocks_per_axis = (N + 31) / 32;
     dim3 blocks(blocks_per_axis, blocks_per_axis);
 
-    int mod = ((N + 2) * (N + 2)) % 128;
-    int blc_bd_task = ((N + 2) * (N + 2)) / 128 + (mod != 0 ? 1 : 0);
+    int blc_bd_task = ((N + 2) * (N + 2) + 127) / 128;
     dim3 blocks_for_bd_task(blc_bd_task);
 
     advect_field_device<<<blocks, dim3(32, 32)>>>(
@@ -387,11 +465,10 @@ __host__  void FluidGpu::advect_density(float dt)
 __host__ void FluidGpu::advect_velocity(float dt)
 {
     cudaError_t err;
-    int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
+    int blocks_per_axis = (N + 31) / 32;
     dim3 blocks(blocks_per_axis, blocks_per_axis);
 
-    int mod = ((N + 2) * (N + 2)) % 128;
-    int blc_bd_task = ((N + 2) * (N + 2)) / 128 + (mod != 0 ? 1 : 0);
+    int blc_bd_task = ((N + 2) * (N + 2) + 127) / 128;
     dim3 blocks_for_bd_task(blc_bd_task);
 
     advect_field_device<<<blocks, dim3(32, 32)>>>(u_surf, v_surf, u_surf, x_surf, N, h, dt);
@@ -425,16 +502,15 @@ __host__ void FluidGpu::advect_velocity(float dt)
 __host__ void FluidGpu::solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new, cudaSurfaceObject_t x, cudaSurfaceObject_t b, float a, float c, enum BoundaryHandleEnum e)
 {
     cudaError_t err;
-    int blocks_per_axis = (N / 32) + (N % 32 ? 1 : 0);
+    int blocks_per_axis = (N + 31) / 32;
     dim3 blocks(blocks_per_axis, blocks_per_axis);
 
-    int mod = ((N + 2) * (N + 2)) % 128;
-    int blc_bd_task = ((N + 2) * (N + 2)) / 128 + (mod != 0 ? 1 : 0);
+    int blc_bd_task = ((N + 2) * (N + 2) + 127) / 128;
     dim3 blocks_for_bd_task(blc_bd_task);
 
     for (int iter = 0; iter < 20; iter++)
     {
-        laplace_eq_solver_step_device<<<blocks, dim3(32, 32), sizeof(float) * 32 * 32>>>(
+        laplace_eq_solver_step_device<<<blocks, dim3(32, 32), sizeof(float) * 34 * 34>>>(
             x_new, x, b, a, c, N);
 
         err = cudaGetLastError();

@@ -53,7 +53,7 @@ public:
         density[at(x, y)] += val;
     }
 
-    void draw_into_bitmap(MyBitmap &bitmap);
+    bool draw_into_bitmap(MyBitmap &bitmap);
 
     constexpr size_t at(size_t x, size_t y) noexcept { return y * (N + 2) + x; };
 

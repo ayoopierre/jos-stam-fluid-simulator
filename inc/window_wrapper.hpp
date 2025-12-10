@@ -26,7 +26,10 @@ public:
         img = GenImageColor(width, height, BLANK);
         tex = LoadTextureFromImage(img);
         pixels = LoadImageColors(img);
-        bitmap = { (MyColor *)pixels, this->width, this->height };
+
+        printf("TEXTURE ID : %u\n", tex.id);
+
+        bitmap = { (MyColor *)pixels, this->width, this->height, tex.id };
         this->f = f;
         SetTargetFPS(60);
     }
@@ -41,8 +44,10 @@ public:
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-        f->draw_into_bitmap(bitmap);
-        UpdateTexture(tex, pixels);
+        /* Trying to use fluid update method */
+        if(f->draw_into_bitmap(bitmap)){
+            UpdateTexture(tex, pixels);
+        }
 
         DrawTexturePro(tex,
                        {0, 0, (float)width, (float)height},

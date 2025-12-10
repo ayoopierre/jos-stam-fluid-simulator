@@ -34,7 +34,7 @@ FluidCpu::FluidCpu(size_t N)
     std::fill(new_density.begin(), new_density.end(), 0.0);
 }
 
-void FluidCpu::draw_into_bitmap(MyBitmap &bitmap)
+bool FluidCpu::draw_into_bitmap(MyBitmap &bitmap)
 {
     float minVal = MY_DBL_MAX, maxVal = MY_DBL_MIN;
 
@@ -61,6 +61,9 @@ void FluidCpu::draw_into_bitmap(MyBitmap &bitmap)
             bitmap.bitmap[y * bitmap.width + x] = heat_color(t);
         }
     }
+
+    /* This function has to flush CPU side buffer to GPU side texture */
+    return true;
 }
 
 void FluidCpu::apply_sources(float dt)

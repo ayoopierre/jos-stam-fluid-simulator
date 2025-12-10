@@ -13,6 +13,13 @@
 #include "fluid.hpp"
 #include "utils.hpp"
 
+#define CUDA_ERR_CHECK(err)                                                    \
+    if (err != 0)                                                              \
+    {                                                                          \
+        printf("%s:%d - %s\n", __FUNCTION__, __LINE__, cudaGetErrorName(err)); \
+        exit(1);                                                               \
+    }
+
 class Window;
 
 class FluidGpu : public Fluid
@@ -22,11 +29,20 @@ public:
 
     __host__ inline void step(float dt)
     {
+        diffuse_density(dt);
+        advect_density(dt);
+
+        diffuse_velocity(dt);
+        project(dt);
+        advect_velocity(dt);
+        project(dt);
+
+        cudaError_t err;
+        err = cudaDeviceSynchronize();
+        CUDA_ERR_CHECK(err);
     }
 
-    __host__ inline void draw_into_bitmap(MyBitmap &bitmap){
-
-    }
+    __host__ bool draw_into_bitmap(MyBitmap &bitmap);
 
 private:
     enum class BoundaryHandleEnum
@@ -43,12 +59,13 @@ private:
     __host__ void advect_velocity(float dt);
 
     __host__ void solve_laplace_eq_JA_solver(cudaSurfaceObject_t x_new,
-                                    cudaSurfaceObject_t x, cudaSurfaceObject_t b,
-                                    float a, float c, enum BoundaryHandleEnum e);
+                                             cudaSurfaceObject_t x, cudaSurfaceObject_t b,
+                                             float a, float c, enum BoundaryHandleEnum e);
     __host__ void prepare_surface(cudaResourceDesc *desc, cudaSurfaceObject_t *surf, cudaArray_t *arr);
 
     /* */
     cudaChannelFormatDesc channel_desc;
+    cudaGraphicsResource_t cuda_graphics_resource;
 
     /* Resource handles */
     cudaResourceDesc density_desc;

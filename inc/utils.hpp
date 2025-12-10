@@ -25,6 +25,7 @@ struct MyBitmap
     MyColor *bitmap;
     size_t width;
     size_t height;
+    unsigned int texture_id;
 };
 
 typedef MyBitmap MyBitmap;
