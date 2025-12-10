@@ -27,8 +27,6 @@ public:
         tex = LoadTextureFromImage(img);
         pixels = LoadImageColors(img);
 
-        printf("TEXTURE ID : %u\n", tex.id);
-
         bitmap = { (MyColor *)pixels, this->width, this->height, tex.id };
         this->f = f;
         SetTargetFPS(60);

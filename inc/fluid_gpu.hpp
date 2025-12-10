@@ -29,6 +29,7 @@ public:
 
     __host__ inline void step(float dt)
     {
+        apply_sources(dt);
         diffuse_density(dt);
         advect_density(dt);
 
@@ -52,6 +53,7 @@ private:
         HandleRho
     };
 
+    __host__ void apply_sources(float dt);
     __host__ void diffuse_density(float dt);
     __host__ void diffuse_velocity(float dt);
     __host__ void project(float dt);

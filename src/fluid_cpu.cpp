@@ -228,7 +228,6 @@ float FluidCpu::sample_field(float x, float y, float *field)
     if (y > ymax)
         y = ymax;
 
-    // convert to grid coordinates (1..N in cell indices, but 0..N+1 in array)
     float gx = x / h;
     float gy = y / h;
 
@@ -241,7 +240,6 @@ float FluidCpu::sample_field(float x, float y, float *field)
     float sx = gx - i0;
     float sy = gy - j0;
 
-    // clamp indices to valid array bounds [0 .. N+1]
     i0 = std::clamp(i0, 0, (int)N + 1);
     i1 = std::clamp(i1, 0, (int)N + 1);
     j0 = std::clamp(j0, 0, (int)N + 1);
