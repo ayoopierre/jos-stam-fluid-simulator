@@ -106,7 +106,8 @@ __global__ static void laplace_eq_solver_step_device(
         We have shmem (threads.x + 2) * (threads.y + 2)
         and since we got 1024 threads per group we have
         8Kb of shared memory for tile caching which should
-        fit in any GPU L1 cache.
+        fit in any GPU L1 cache. Only global memory access
+        conflicts are possible on tile boundary.
         */
         extern __shared__ float tile[];
         int w = blockDim.x + 2;
@@ -220,12 +221,11 @@ __device__ static float bilerp_device(
     float gx = x / h;
     float gy = y / h;
 
-    int i0 = (int)floor(gx); // base index
+    int i0 = (int)floor(gx);
     int j0 = (int)floor(gy);
     int i1 = i0 + 1;
     int j1 = j0 + 1;
 
-    // fractional parts
     float sx = gx - i0;
     float sy = gy - j0;
 
@@ -385,12 +385,14 @@ __host__ bool FluidGpu::draw_into_bitmap(MyBitmap &bitmap)
     err = cudaDeviceSynchronize();
     CUDA_ERR_CHECK(err);
 
+    err = cudaFree(minmax_d);
+    CUDA_ERR_CHECK(err);
+
     err = cudaDestroySurfaceObject(temp_surface);
     CUDA_ERR_CHECK(err);
 
     err = cudaGraphicsUnmapResources(1, &cuda_graphics_resource);
     CUDA_ERR_CHECK(err);
-
     /* This function modifies texture directly */
     return false;
 }
@@ -431,7 +433,7 @@ __host__ void FluidGpu::diffuse_velocity(float dt)
     std::swap(x_surf, u_surf);
 
     solve_laplace_eq_JA_solver(x_new_surf, x_surf, v_surf, a, 1.0 + 4.0 * a, BoundaryHandleEnum::HandleV);
-    /* New u surface is stored in coresponding x surface*/
+    /* New v surface is stored in coresponding x_new surface*/
     std::swap(x_surf, v_surf);
 }
 

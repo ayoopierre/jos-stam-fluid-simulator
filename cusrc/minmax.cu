@@ -9,7 +9,6 @@ __device__ float SurfaceReader::operator()(int idx) const
     int x = idx % width;
     int y = idx / width;
 
-    // Use the appropriate template type for surf2Dread
     float val;
     surf2Dread(&val, surfObj, x * sizeof(float), y);
     return val;

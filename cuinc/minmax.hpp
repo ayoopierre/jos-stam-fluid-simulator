@@ -15,7 +15,6 @@ public:
 
     __host__ __device__ SurfaceReader(cudaSurfaceObject_t s, int w) : surfObj(s), width(w) {}
 
-    // Read the surface at the calculated coordinates
     __device__ float operator()(int idx) const;
 };
 

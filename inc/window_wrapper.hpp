@@ -58,34 +58,6 @@ public:
         EndDrawing();
     }
 
-    inline void handle_input()
-    {
-        static Vector2 prev = {0};
-        Vector2 mouse_pos = GetMousePosition();
-        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
-        {
-            // int x = (int)(mouse_pos.x * f->N / this->width);
-            // int y = (int)(mouse_pos.y * f->N / this->height);
-
-            // float dx = (mouse_pos.x - prev.x) / (float)this->width;
-            // float dy = (mouse_pos.y - prev.y) / (float)this->height;
-
-            // f->add_fluid(x, y, 0.1);
-            // f->add_u(x, y, dx);
-            // f->add_v(x, y, -dy);
-        }
-        prev = mouse_pos;
-    }
-
-    inline Color HeatColor(float t)
-    {
-        return {
-            (unsigned char)(255 * t), // red
-            (unsigned char)(255 * t), // green peak in middle
-            (unsigned char)(255 * t), // blue
-            255};
-    }
-
     inline void close()
     {
         CloseWindow();
